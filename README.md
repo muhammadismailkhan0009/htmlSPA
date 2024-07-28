@@ -1,6 +1,6 @@
 This is a javascript backend-agnostic library to allow developers to write HTML-based single page applications.
 With this library, you do not need React, or Nextjs or any other javascript frameworks to develop single-page applications. Just use this library and the tags defined for it and you can easily build your SPA while staying in all-to-familiar HTML file.
-\n
+
 The features of this library include(so far):
 - framework agnostic: you can use any framework for backend as you desire.
 - back and forth navigation of pages with routing
