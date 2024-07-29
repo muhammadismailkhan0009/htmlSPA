@@ -1,39 +1,20 @@
 // spa_framework.js
 
+/**
+ * TODO: add event handling and re-initialization in library instead of html-tag based events.
+ * 
+ * 
+ */
 // Cache object to store fetched JavaScript files
 const jsCache = new Map();
 
-// Function to fetch and cache JavaScript files
-async function fetchAndCacheJS(url) {
-    if (jsCache.get(url)) {
-        console.log("exists");
-        return jsCache.get(url);
-    }
-
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch ${url}`);
-        }
-        const jsContent = await response.text();
-        console.log("fetching new data");
-        jsCache.set(url, jsContent);
-        return jsContent;
-    } catch (error) {
-        console.error(error);
-        return null;
-    }
-}
-
-// TODO: make sure that every type of js is executable
-function executeJS(code) {
-    try {
-        const script = document.createElement('script');
-        script.textContent = code;
-        document.body.appendChild(script);
-    } catch (error) {
-        console.error('Failed to execute JavaScript:', error);
-    }
+// it injects js to html instead of saving in library. this makes management and state persistence very easy
+function injectJS(url) {
+    const scriptElement = document.createElement('script');
+    scriptElement.setAttribute('type', 'module');
+    scriptElement.setAttribute('src', url);
+    jsCache.set(url, `Script loaded successfully: ${url}`); // Add to cache once loaded
+    document.body.appendChild(scriptElement);
 }
 
 // Function to handle mouseenter event
@@ -41,10 +22,8 @@ async function handleTriggerEvent(event) {
     const element = event.currentTarget;
     const jsUrl = element.getAttribute('data-spa-js');
     if (jsUrl && !jsCache.get(jsUrl)) {
-        const jsCode = await fetchAndCacheJS(jsUrl);
-        if (jsCode) {
-            executeJS(jsCode);
-        }
+
+        injectJS(jsUrl);
     }
 }
 
@@ -53,7 +32,8 @@ window.addEventListener('popstate', async (event) => {
     const state = event.state;
     if (state) {
         revertComponents(state.content);
-    } 
+    }
+    initializeCustomEventHandlers();
     // TODO: handle issue where state is null
 });
 
@@ -73,6 +53,7 @@ async function handleNavigation(url, targetId) {
     if (htmlContent) {
         replaceContent(htmlContent, targetId);
         captureNextState(url);
+        initializeCustomEventHandlers();
     }
 }
 
@@ -115,6 +96,8 @@ function replaceContent(htmlContent, targetId) {
     }
 }
 
+// TODO: in future make it so that the first element marked with data-spa-component becomes component and is used for data.
+// after that component is selected, remove data-spa-component from all other elements in html. you'll need to do this proactively.
 function getComponent(htmlString) {
     // Create a DOM parser to parse the HTML string
     const parser = new DOMParser();
@@ -184,7 +167,7 @@ function initSPA() {
 
     interceptAnchorClicks();
 
-    // Set up MutationObserver to handle dynamically added elements
+    // this allows to monitor DOM continuously for given selectors and run logic accordingly
     const observer = new MutationObserver(mutations => {
         mutations.forEach(mutation => {
             mutation.addedNodes.forEach(node => {
@@ -200,15 +183,29 @@ function initSPA() {
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
+
+    // Initialize custom event handlers
+    initializeCustomEventHandlers();
 }
+
+const customEventHandlers = [];
+
+export function registerEventHandler(selector, event, handler) {
+    customEventHandlers.push({ selector, event, handler });
+    document.querySelectorAll(selector).forEach(element => {
+        element.addEventListener(event, handler);
+    });
+}
+
+function initializeCustomEventHandlers() {
+    customEventHandlers.forEach(({ selector, event, handler }) => {
+        document.querySelectorAll(selector).forEach(element => {
+            element.addEventListener(event, handler);
+        });
+    });
+}
+
 // Initialize the SPA framework on DOMContentLoaded
 document.addEventListener('DOMContentLoaded', () => {
     initSPA();
-    // Capture the initial state
-
-    // const initialState = {
-    //     content: document.documentElement.outerHTML,
-    //     url: window.location.href
-    // };
-    // window.history.replaceState(initialState, '', initialState.url);
 });
