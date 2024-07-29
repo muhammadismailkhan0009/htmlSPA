@@ -132,7 +132,7 @@ function getSavedComponents() {
     return components;
 }
 
-// TODO: make it so that the clicks events are not handled here, but in individual js file where they are necessary
+// TODO: one reason it may be needed is when handling resources like /profile and others. not needed for /login and /signup anymore
 function interceptAnchorClicks() {
     document.body.addEventListener('click', async (event) => {
         const target = event.target;
