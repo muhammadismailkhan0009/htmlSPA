@@ -7,6 +7,9 @@ The features of this library include(so far):
 - javascript code fetch and caching only when needed(the concept of qwik framework)
 - attributes that can be used inside HTML for different behaviors
 
+Restrictions:
+- if there is any event handler, it must be registered with library via "registerEventHandler(selector,event,listner)" method.
+  
 Note: for this library to work, you must add id attributes for all html tags in which you will be using these attributes.
 
 Following are the attributes developed so far(subject to change):
