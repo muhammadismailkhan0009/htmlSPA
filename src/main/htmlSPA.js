@@ -1,7 +1,7 @@
 // spa_framework.js
 
 /**
- * TODO: add event handling and re-initialization in library instead of html-tag based events.
+ * TODO: add html replacing via target attribute just list htmx
  * 
  * 
  */
@@ -13,8 +13,21 @@ function injectJS(url) {
     const scriptElement = document.createElement('script');
     scriptElement.setAttribute('type', 'module');
     scriptElement.setAttribute('src', url);
+    scriptElement.setAttribute('async','');
     jsCache.set(url, `Script loaded successfully: ${url}`); // Add to cache once loaded
     document.body.appendChild(scriptElement);
+}
+
+// Scan for all data-spa-js attributes and inject script tags
+function loadAllScripts() {
+    const elements = document.querySelectorAll('[data-spa-js]');
+    elements.forEach(element => {
+        const jsUrl = element.getAttribute('data-spa-js');
+        if (jsUrl && !jsCache.has(jsUrl)) {
+            injectJS(jsUrl);
+
+        }
+    });
 }
 
 // Function to handle mouseenter event
@@ -149,6 +162,8 @@ function interceptAnchorClicks() {
     });
 }
 
+// TODO: think of some way to manage things like popup by fetching html content from backend once and save on client side to avoid api calls
+
 function initializeElements(elements) {
     elements.forEach(element => {
         const trigger = element.getAttribute('data-spa-trigger');
@@ -162,10 +177,12 @@ function initializeElements(elements) {
 // Function to initialize the SPA framework
 function initSPA() {
     // Find all elements with data-spa-js attribute
+    // TODO: remove below block with data-spa-js and trigger
     const elements = document.querySelectorAll('[data-spa-js][data-spa-trigger]');
     initializeElements(elements);
-
-    interceptAnchorClicks();
+    
+    loadAllScripts();
+    interceptAnchorClicks();//TODO: remove this line and block as well
 
     // this allows to monitor DOM continuously for given selectors and run logic accordingly
     const observer = new MutationObserver(mutations => {
