@@ -38,3 +38,4 @@ Suggestions and contributions are welcome. Please open issues or participate in 
 ---
 
 This library aims to simplify the development of SPAs by leveraging familiar HTML and minimal JavaScript, making it easier for developers to create powerful and dynamic web applications without the overhead of heavy frameworks.
+
