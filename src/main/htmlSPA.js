@@ -8,35 +8,30 @@
 // Cache object to store fetched JavaScript files
 const jsCache = new Map();
 
-// it injects js to html instead of saving in library. this makes management and state persistence very easy
-function injectJS(url) {
-    const scriptElement = document.createElement('script');
-    scriptElement.setAttribute('type', 'module');
-    scriptElement.setAttribute('src', url);
-    scriptElement.setAttribute('async','');
-    jsCache.set(url, `Script loaded successfully: ${url}`); // Add to cache once loaded
-    document.body.appendChild(scriptElement);
+// Cache object to store fetched HTML content
+const htmlCache = new Map();
+
+// Function to fetch HTML content
+async function fetchHTML(url) {
+    if (htmlCache.has(url)) {
+        return htmlCache.get(url);
+    }
+    return callFetchRequest(url);
+
 }
 
-// Scan for all data-spa-js attributes and inject script tags
-function loadAllScripts() {
-    const elements = document.querySelectorAll('[data-spa-js]');
-    elements.forEach(element => {
-        const jsUrl = element.getAttribute('data-spa-js');
-        if (jsUrl && !jsCache.has(jsUrl)) {
-            injectJS(jsUrl);
-
+async function callFetchRequest(url) {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch ${url}`);
         }
-    });
-}
-
-// Function to handle mouseenter event
-async function handleTriggerEvent(event) {
-    const element = event.currentTarget;
-    const jsUrl = element.getAttribute('data-spa-js');
-    if (jsUrl && !jsCache.get(jsUrl)) {
-
-        injectJS(jsUrl);
+        const htmlContent = await response.text();
+        htmlCache.set(url, htmlContent);
+        return htmlContent;
+    } catch (error) {
+        console.error(error);
+        return null;
     }
 }
 
@@ -166,21 +161,89 @@ function interceptAnchorClicks() {
 
 function initializeElements(elements) {
     elements.forEach(element => {
+        if (element.hasAttribute('data-spa-js')) {
+            injectJS(element.getAttribute('data-spa-js'));
+        }
+
         const trigger = element.getAttribute('data-spa-trigger');
         if (trigger === 'onHover') {
             element.addEventListener('mouseenter', handleTriggerEvent);
         } else if (trigger === 'onLoad') {
             handleTriggerEvent({ currentTarget: element });
         }
+        else if (trigger === 'onClick') {
+            element.addEventListener('click', handleTriggerEvent);
+        }
     });
 }
+
+// it injects js to html instead of saving in library. this makes management and state persistence very easy
+function injectJS(url) {
+    if (url && !jsCache.has(url)) {
+        const scriptElement = document.createElement('script');
+        scriptElement.setAttribute('type', 'module');
+        scriptElement.setAttribute('src', url);
+        scriptElement.setAttribute('async', '');
+        jsCache.set(url, `Script loaded successfully: ${url}`); // Add to cache once loaded
+        document.body.appendChild(scriptElement);
+    }
+}
+
+// Scan for all data-spa-js attributes and inject script tags
+function loadAllScripts() {
+    const elements = document.querySelectorAll('[data-spa-js]');
+    elements.forEach(element => {
+        const jsUrl = element.getAttribute('data-spa-js');
+        injectJS(jsUrl);
+    });
+}
+
+// TODO: consider this parent event trigger handler and write its childs with if-else logic
+async function handleTriggerEvent(event) {
+    const element = event.currentTarget;
+
+    // js should be downloadable by default and must be added on each element addtition without event trigger
+    if (element.hasAttribute('data-spa-get')) {
+        handleGetRequest(element);
+    }
+
+
+}
+
+
+async function handleGetRequest(element) {
+    const url = element.getAttribute('data-spa-get').split(',')[0];
+    const targetId = element.getAttribute('data-spa-target');
+    const swapMethod = element.getAttribute('data-spa-swap');
+    const cache = element.hasAttribute('data-spa-cache');
+
+    let htmlContent;
+    if (cache) {
+        htmlContent = await fetchHTML(url);
+    } else {
+        htmlContent = callFetchRequest(url);
+    }
+
+    if (htmlContent) {
+        const targetElement = document.querySelector(`[data-spa-item="${targetId}"]`);
+        if (targetElement) {
+            if (swapMethod === 'outerHTML') {
+                targetElement.outerHTML = htmlContent;
+            } else if (swapMethod === 'innerHTML') {
+                targetElement.innerHTML = htmlContent;
+            }
+
+        }
+    }
+}
+
 // Function to initialize the SPA framework
 function initSPA() {
     // Find all elements with data-spa-js attribute
     // TODO: remove below block with data-spa-js and trigger
-    const elements = document.querySelectorAll('[data-spa-js][data-spa-trigger]');
+    const elements = document.querySelectorAll(':is([data-spa-js],[data-spa-trigger])');
     initializeElements(elements);
-    
+
     loadAllScripts();
     interceptAnchorClicks();//TODO: remove this line and block as well
 
@@ -189,10 +252,7 @@ function initSPA() {
         mutations.forEach(mutation => {
             mutation.addedNodes.forEach(node => {
                 if (node.nodeType === 1) { // Element node
-                    const elements = node.querySelectorAll('[data-spa-js][data-spa-trigger]');
-                    if (node.matches('[data-spa-js][data-spa-trigger]')) {
-                        initializeElements([node]);
-                    }
+                    const elements = node.parentElement.querySelectorAll(':is([data-spa-js],[data-spa-trigger])');
                     initializeElements(elements);
                 }
             });
@@ -221,6 +281,8 @@ function initializeCustomEventHandlers() {
         });
     });
 }
+
+// TODO: if a component-marked object has been added into DOM, don't fetch its html again and again
 
 // Initialize the SPA framework on DOMContentLoaded
 document.addEventListener('DOMContentLoaded', () => {
