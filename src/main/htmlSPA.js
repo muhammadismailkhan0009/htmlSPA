@@ -185,7 +185,7 @@ function injectJS(url) {
         scriptElement.setAttribute('src', url);
         scriptElement.setAttribute('async', '');
         jsCache.set(url, `Script loaded successfully: ${url}`); // Add to cache once loaded
-        document.body.appendChild(scriptElement);
+        document.head.appendChild(scriptElement);
     }
 }
 
