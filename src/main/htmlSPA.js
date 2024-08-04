@@ -174,11 +174,73 @@ function initializeElements(elements) {
         else if (trigger === 'onClick') {
             element.addEventListener('click', handleTriggerEvent);
         }
+
+        // Initialize forms with data-spa-post attribute
+        else if (trigger === 'onSubmit') {
+            element.addEventListener('submit', handleFormSubmit);
+        }
     });
 }
 
+function assignGlobalVariableValues(form) {
+    const elementsWithVariable = form.querySelectorAll('[data-spa-variable]');
+    elementsWithVariable.forEach(element => {
+        const globalVarName = element.getAttribute('data-spa-variable');
+        if (globalVarName && window[globalVarName] !== undefined) {
+            element.value = window[globalVarName];
+        }
+    });
+}
+
+
+
+async function handleFormSubmit(event) {
+    const form = event.currentTarget;
+
+    // Check if the form is valid
+    if (!form.reportValidity()) {
+        return; // Form is not valid, so do nothing
+    }
+
+    event.preventDefault(); // Prevent default form submission
+
+    assignGlobalVariableValues(form);
+    const url = form.getAttribute('data-spa-post');
+    const targetId = form.getAttribute('data-spa-target');
+
+    const formData = new FormData(form);
+    const params = new URLSearchParams();
+
+    formData.forEach((value, key) => {
+        params.append(key, value);
+    });
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            body: params,
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to submit form to ${url}`);
+        }
+
+        const htmlContent = await response.text();
+
+        if (htmlContent) {
+            const targetElement = document.querySelector(targetId);
+            if (targetElement) {
+                targetElement.innerHTML = htmlContent;
+            }
+        }
+    } catch (error) {
+        console.error(`Error submitting form: ${error}`);
+    }
+}
+
+
 // it injects js to html instead of saving in library. this makes management and state persistence very easy
-function injectJS(url) {
+async function injectJS(url) {
     if (url && !jsCache.has(url)) {
         const scriptElement = document.createElement('script');
         scriptElement.setAttribute('type', 'module');
@@ -190,7 +252,7 @@ function injectJS(url) {
 }
 
 // Scan for all data-spa-js attributes and inject script tags
-function loadAllScripts() {
+async function loadAllScripts() {
     const elements = document.querySelectorAll('[data-spa-js]');
     elements.forEach(element => {
         const jsUrl = element.getAttribute('data-spa-js');
