@@ -11,13 +11,26 @@ const jsCache = new Map();
 // Cache object to store fetched HTML content
 const htmlCache = new Map();
 
+function createElementFromTemplate(template) {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = template.trim();
+    return tempDiv.firstElementChild;
+}
+
 // Function to fetch HTML content
 async function fetchHTML(url) {
     if (htmlCache.has(url)) {
         return htmlCache.get(url);
     }
-    return callFetchRequest(url);
-
+    else {
+        const htmlContent = await callFetchRequest(url);
+        const htmlElement = createElementFromTemplate(htmlContent);
+        htmlCache.set(url, htmlContent);//TODO: save this as element as well rather than raw html content
+        if (htmlElement.hasAttribute('data-spa-component')) {
+            htmlCache.set(htmlElement.getAttribute('data-spa-component'), htmlElement);
+        }
+        return htmlContent;
+    }
 }
 
 async function callFetchRequest(url) {
@@ -27,7 +40,7 @@ async function callFetchRequest(url) {
             throw new Error(`Failed to fetch ${url}`);
         }
         const htmlContent = await response.text();
-        htmlCache.set(url, htmlContent);
+
         return htmlContent;
     } catch (error) {
         console.error(error);
@@ -282,11 +295,12 @@ async function handleGetRequest(element) {
     let htmlContent;
     if (cache) {
         htmlContent = await fetchHTML(url);
+
     } else {
-        htmlContent = callFetchRequest(url);
+        htmlContent = await callFetchRequest(url);
     }
 
-    if (htmlContent) {
+    if (htmlContent && targetId && swapMethod) {
         const targetElement = document.querySelector(`[data-spa-item="${targetId}"]`);
         if (targetElement) {
             if (swapMethod === 'outerHTML') {
@@ -334,6 +348,10 @@ export function registerEventHandler(selector, event, handler) {
     document.querySelectorAll(selector).forEach(element => {
         element.addEventListener(event, handler);
     });
+}
+
+export function getComponentToRenderFromCache(component_id) {
+    return htmlCache.get(component_id);
 }
 
 function initializeCustomEventHandlers() {
