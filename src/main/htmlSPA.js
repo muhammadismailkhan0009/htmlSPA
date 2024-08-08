@@ -178,20 +178,32 @@ function initializeElements(elements) {
             injectJS(element.getAttribute('data-spa-js'));
         }
 
-        const trigger = element.getAttribute('data-spa-trigger');
-        if (trigger === 'onHover') {
-            element.addEventListener('mouseenter', handleTriggerEvent);
-        } else if (trigger === 'onLoad') {
-            handleTriggerEvent({ currentTarget: element });
-        }
-        else if (trigger === 'onClick') {
-            element.addEventListener('click', handleTriggerEvent);
+        if (element.hasAttribute('data-spa-trigger')) {
+            const trigger = element.getAttribute('data-spa-trigger');
+            if (trigger === 'onHover') {
+                element.addEventListener('mouseenter', handleTriggerEvent);
+            } else if (trigger === 'onLoad') {
+                handleTriggerEvent({ currentTarget: element });
+            }
+            else if (trigger === 'onClick') {
+                element.addEventListener('click', handleTriggerEvent);
+            }
+
+            // Initialize forms with data-spa-post attribute
+            else if (trigger === 'onSubmit') {
+                element.addEventListener('submit', handleFormSubmit);
+            }
         }
 
-        // Initialize forms with data-spa-post attribute
-        else if (trigger === 'onSubmit') {
-            element.addEventListener('submit', handleFormSubmit);
+        // saves components so that can be retrieved for custom js
+        if (element.hasAttribute('data-spa-component')) {
+            const componentId = element.getAttribute('data-spa-component');
+            if (!htmlCache.has(componentId)) {
+                htmlCache.set(componentId, element);
+            }
+
         }
+
     });
 }
 
@@ -317,7 +329,7 @@ async function handleGetRequest(element) {
 function initSPA() {
     // Find all elements with data-spa-js attribute
     // TODO: remove below block with data-spa-js and trigger
-    const elements = document.querySelectorAll(':is([data-spa-js],[data-spa-trigger])');
+    const elements = document.querySelectorAll(':is([data-spa-js],[data-spa-trigger],[data-spa-component])');
     initializeElements(elements);
 
     loadAllScripts();
@@ -328,7 +340,7 @@ function initSPA() {
         mutations.forEach(mutation => {
             mutation.addedNodes.forEach(node => {
                 if (node.nodeType === 1) { // Element node
-                    const elements = node.parentElement.querySelectorAll(':is([data-spa-js],[data-spa-trigger])');
+                    const elements = node.parentElement.querySelectorAll(':is([data-spa-js],[data-spa-trigger],[data-spa-component])');
                     initializeElements(elements);
                 }
             });
