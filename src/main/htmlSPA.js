@@ -2,7 +2,7 @@
 
 /**
  * TODO: add html replacing via target attribute just list htmx
- * 
+ * !: indicate which values to store in globla storage(prmn) and which to store in window(temp)
  * 
  */
 // Cache object to store fetched JavaScript files
@@ -196,7 +196,7 @@ function initializeElements(elements) {
         }
 
         // saves components so that can be retrieved for custom js
-        if (element.hasAttribute('data-spa-component')) {
+        if (element.hasAttribute('data-spa-component') && element.hasAttribute('data-spa-cache')) {
             const componentId = element.getAttribute('data-spa-component');
             if (!htmlCache.has(componentId)) {
                 htmlCache.set(componentId, element);
@@ -211,11 +211,67 @@ function assignGlobalVariableValues(form) {
     const elementsWithVariable = form.querySelectorAll('[data-spa-variable]');
     elementsWithVariable.forEach(element => {
         const globalVarName = element.getAttribute('data-spa-variable');
-        if (globalVarName && window[globalVarName] !== undefined) {
-            element.value = window[globalVarName];
+        if (globalVarName && localStorage.getItem(globalVarName) !== undefined) {
+            element.value = localStorage.getItem(globalVarName);
         }
     });
 }
+
+function getParameterValue(paramName, element) {
+    if (paramName.startsWith('@dom:')) {
+        const parts = paramName.replace('@dom:', '').split(':');
+        const direction = parts[0]; // 'unique', 'up', or 'down'
+        const searchParam = parts[1]; // The actual param attribute value to search for
+        let targetElement = null;
+
+        if (direction === 'unique') {
+            // Search the whole document for the unique parameter
+            targetElement = document.querySelector(`[data-spa-param="${searchParam}"]`);
+        } else if (direction === 'up') {
+            // Traverse upwards and across siblings to find the first occurrence of the param
+            let currentElement = element;
+
+            while (currentElement && !targetElement) {
+                // Check the current element's siblings first
+                targetElement = currentElement.parentElement
+                    ? currentElement.parentElement.querySelector(`[data-spa-param="${searchParam}"]`)
+                    : null;
+
+                // If not found in siblings, move up to the parent
+                currentElement = currentElement.parentElement;
+            }
+        } else if (direction === 'down') {
+            // Search downwards within the children to find the first occurrence of the param
+            targetElement = element.querySelector(`[data-spa-param="${searchParam}"]`);
+        }
+
+        // Only fetch the value if targetElement is found
+        if (targetElement) {
+            return fetchElementValue(targetElement);
+        }
+    } else {
+        // Fetch from LocalStorage
+        return localStorage.getItem(paramName);
+    }
+
+    return null; // Return null if the value is not found
+}
+
+
+function fetchElementValue(element) {
+    if (!element) return null;
+
+    // Fetch the value from the element based on its type
+    if (element.value !== undefined) {
+        return element.value;
+    } else if (element.textContent !== undefined) {
+        return element.textContent;
+    } else {
+        return element.innerHTML;
+    }
+}
+
+
 
 
 
@@ -293,8 +349,67 @@ async function handleTriggerEvent(event) {
     if (element.hasAttribute('data-spa-get')) {
         handleGetRequest(element);
     }
+    else if (element.hasAttribute('data-spa-post')) {
+        await handleElementPostRequest(element);
+    }
 
 
+}
+
+/**
+ * TODO: for future, add support such as it can map json value to any level as intended with level as param
+ */
+async function handleElementPostRequest(element) {
+    // Extract URL and response format from data-spa-post
+    const [url, responseFormat] = element.getAttribute('data-spa-post').split(',');
+
+    // Get parameters to send with the request
+    const params = new URLSearchParams();
+    const paramNames = element.getAttribute('data-spa-params').split(',');
+
+    paramNames.forEach(paramName => {
+        const paramValue = getParameterValue(paramName, element);
+        if (paramValue) {
+            params.append(paramName.replace(/^@dom:(up|down):/, ''), paramValue); // Append without the @dom: prefix
+        }
+    });
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            body: params,
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to submit request to ${url}`);
+        }
+
+        const jsonResponse = await response[responseFormat.trim()](); // Handle response format (json, text, etc.)
+
+        // Update the output elements based on data-spa-target
+        const targetMappings = element.getAttribute('data-spa-target')
+            .replace(/{|}/g, '')  // Remove the curly braces
+            .split(',');
+
+        targetMappings.forEach(mapping => {
+            const [jsonKey, spaItemKey] = mapping.split('->').map(item => item.trim());
+
+            // Find all target elements recursively within the DOM using data-spa-item attribute
+            const targetChildren = element.querySelectorAll(`[data-spa-item="${spaItemKey}"]`);
+
+            // Iterate over all found elements at all levels and update their content
+            targetChildren.forEach(targetChild => {
+                if (jsonResponse[jsonKey] !== undefined) {
+                    targetChild.textContent = jsonResponse[jsonKey];
+                }
+            });
+        });
+
+
+
+    } catch (error) {
+        console.error(`Error submitting request: ${error}`);
+    }
 }
 
 
@@ -329,7 +444,8 @@ async function handleGetRequest(element) {
 function initSPA() {
     // Find all elements with data-spa-js attribute
     // TODO: remove below block with data-spa-js and trigger
-    const elements = document.querySelectorAll(':is([data-spa-js],[data-spa-trigger],[data-spa-component])');
+
+    const elements = document.querySelectorAll(':is([data-spa-js],[data-spa-trigger],[data-spa-component],[data-spa-post])');
     initializeElements(elements);
 
     loadAllScripts();
@@ -340,7 +456,7 @@ function initSPA() {
         mutations.forEach(mutation => {
             mutation.addedNodes.forEach(node => {
                 if (node.nodeType === 1) { // Element node
-                    const elements = node.parentElement.querySelectorAll(':is([data-spa-js],[data-spa-trigger],[data-spa-component])');
+                    const elements = node.parentElement.querySelectorAll(':is([data-spa-js],[data-spa-trigger],[data-spa-component],[data-spa-post])');
                     initializeElements(elements);
                 }
             });
