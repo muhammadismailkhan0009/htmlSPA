@@ -384,6 +384,10 @@ async function handleElementPostRequest(element) {
             throw new Error(`Failed to submit request to ${url}`);
         }
 
+        if (!element.hasAttribute('data-spa-target')) {
+            // If the request was successful and no JSON response is expected, simply return
+            return;
+        }
         const jsonResponse = await response[responseFormat.trim()](); // Handle response format (json, text, etc.)
 
         // Update the output elements based on data-spa-target
