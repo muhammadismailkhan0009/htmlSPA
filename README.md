@@ -22,6 +22,8 @@ Here are the attributes developed so far (subject to change):
 5. **`data-spa-component="component_name"`**: Declares a tag as a component. This can be accessed via query selector in your custom JavaScript code.
 6. **`data-spa-item="item_name"`**: Declares a tag as an item of a component. This can be accessed via query selector in your custom code.
 7. **`data-spa-get="url,option"`**: Fetches HTML content from the server and replaces the content in the target element specified by `data-spa-target`. It supports caching with `data-spa-cache` and content swapping methods with `data-spa-swap`. For now, only "hypermedia" option is supported(will be removed later).
+**`data-spa-post="url,option"`**: Fetches HTML content from the server and replaces the content in the target element specified by `data-spa-target`. It supports caching with `data-spa-cache` and content swapping methods with `data-spa-swap`. For now, only "json" option is supported(will be removed later).
+
 
 ## Restrictions
 

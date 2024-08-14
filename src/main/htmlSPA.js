@@ -3,6 +3,7 @@
 /**
  * TODO: add html replacing via target attribute just list htmx
  * !: indicate which values to store in globla storage(prmn) and which to store in window(temp)
+ * !: handle all form validation logic separately and specifically as its format type is not json or body
  * 
  */
 // Cache object to store fetched JavaScript files
@@ -261,8 +262,11 @@ function getParameterValue(paramName, element) {
 function fetchElementValue(element) {
     if (!element) return null;
 
+    if (element.tagName.toLowerCase() === 'meta') {
+        return element.getAttribute('value');
+    }
     // Fetch the value from the element based on its type
-    if (element.value !== undefined) {
+    else if (element.value !== undefined) {
         return element.value;
     } else if (element.textContent !== undefined) {
         return element.textContent;
@@ -296,10 +300,13 @@ async function handleFormSubmit(event) {
         params.append(key, value);
     });
 
+    const headers = addCustomHeaders(form);
+
     try {
         const response = await fetch(url, {
             method: 'POST',
             body: params,
+            headers: headers
         });
 
         if (!response.ok) {
@@ -356,6 +363,43 @@ async function handleTriggerEvent(event) {
 
 }
 
+// function getHeaderValue(paramName) {
+//     const targetElement = document.querySelector(`[data-spa-param="${paramName}"]`);
+//     return targetElement ? fetchElementValue(targetElement) : null;
+// }
+
+function getHeaderValue(paramOrValue) {
+    if (paramOrValue.startsWith('@param:')) {
+        const paramName = paramOrValue.replace('@param:', '').trim();
+        const targetElement = document.querySelector(`[data-spa-param="${paramName}"]`);
+        return targetElement ? fetchElementValue(targetElement) : null;
+    } else if (paramOrValue.startsWith('@global:')) {
+        const globalVarName = paramOrValue.replace('@global:', '').trim();
+        return localStorage.getItem(globalVarName);  // Fetch the value from localStorage
+    } else {
+        return paramOrValue;  // Return the literal value
+    }
+}
+
+function addCustomHeaders(element) {
+    const headers = {};
+    const headerValues = element.getAttribute('data-spa-headers');
+    const headerMappings = JSON.parse(headerValues);
+
+    Object.keys(headerMappings).forEach(headerName => {
+        const paramName = headerMappings[headerName].trim();
+        const headerValue = getHeaderValue(paramName);
+
+        if (headerValue) {
+            headers[headerName] = headerValue;
+        }
+    });
+
+    return headers;
+}
+
+
+
 /**
  * TODO: for future, add support such as it can map json value to any level as intended with level as param
  */
@@ -374,10 +418,12 @@ async function handleElementPostRequest(element) {
         }
     });
 
+    const headers = addCustomHeaders(element);
     try {
         const response = await fetch(url, {
             method: 'POST',
             body: params,
+            headers: headers
         });
 
         if (!response.ok) {
